@@ -53,9 +53,15 @@ function parseMultipartBody(buffer, boundary)
 {
     var start = 0;
     var end = 0;
+    var sections = [];
     //Find the first index of the boundary bytes
     // in our
     start = buffer.indexOf(boundary, start);
     end = buffer.indexOf(boundary, start);
-    while (start)
+    while (end !== -1)
+    {
+        sections.push(Buffer.from(start,end));
+        start = end;
+        end = buffer.indexOf(boundary, start);
+    }
 }
