@@ -1,5 +1,7 @@
 const qs = require('querystring');
 
+module.exports = parseBody;
+
 function parseBody(req, res, callback){
     var chunks = [];
 
@@ -14,10 +16,10 @@ function parseBody(req, res, callback){
     });
 
     req.on('end', function(){
-        var buffer = Buffer.join(chunks);//Deals with data as binary objects and joins them together
+        var buffer = Buffer.concat(chunks);//Deals with data as binary objects and joins them together
         
         //Determine the content-type of the post request...
-        switch(res.headers['content-type'].split(';')[0])
+        switch(req.headers['content-type'].split(';')[0])
         {
             case "multipart/form-data":
                 // 1) extract the boundary
@@ -43,7 +45,7 @@ function parseBody(req, res, callback){
                 res.end("Bad request");
                 return;
         
-    }
+        }
 
 
     });
@@ -57,11 +59,43 @@ function parseMultipartBody(buffer, boundary)
     //Find the first index of the boundary bytes
     // in our
     start = buffer.indexOf(boundary, start);
+    start += boundary.length;
     end = buffer.indexOf(boundary, start);
     while (end !== -1)
     {
-        sections.push(Buffer.from(start,end));
-        start = end;
+        sections.push(buffer.slice(start,end -2));
+        start = end + boundary.length;
         end = buffer.indexOf(boundary, start);
+    }
+    //We now have all sections in the sections array
+    properties = {};
+    sections.map(parseContent).forEach(function (property){
+        properties[property.key] = property.value;
+    });
+    
+    return [];
+}
+
+function parseContent(content){
+    var index = content.indexOf('\n\n');
+    var headers = content.slice(0, index).toString();
+    var body = content.slice(index + 2);
+    //determine if this is a form field or file
+    if (headers.indexOf('filename') > 0)
+    {
+        var match = /name="(.+)";\s*filename="(.+)"/.exec(headers);
+        return {
+            key: match[1],
+            value: {
+                filename: match[2],
+                data: body
+            }
+        }
+    }
+    else{
+        return {
+            key: /name="(.+)";?/.exec(headers),
+            value: body.toString()
+        }
     }
 }
